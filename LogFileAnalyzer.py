@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 def read_log_file(path: str) -> list[str]:
     """Load the log file and return all lines."""
 
