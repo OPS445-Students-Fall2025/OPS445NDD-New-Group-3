@@ -92,16 +92,73 @@ def detect_strange_ip_logins(lines: list[str]) -> list[str]:
     Identify unusual or repeated IPs attempting login.
     Return a list of suspicious IP addresses.
     """
+    ip_counts = {}
+
+    # Count every IP we see
+    for line in lines:
+        data = parse_log_line(line)
+
+        ip = data.get("ip")
+        if not ip:
+            continue
+
+        ip_counts[ip] = ip_counts.get(ip, 0) + 1
+
+    suspicious = []
+
+    # Analyze frequency + private vs public ranges
+    for ip, count in ip_counts.items():
+        # Flag external/public IPs (all suspicious)
+        if not (
+            ip.startswith("10.") or
+            ip.startswith("192.168.") or
+            ip.startswith("172.")
+        ):
+            suspicious.append(ip)
+            continue
+
+        # Flag internal IPs that hit too many times
+        if count > 10:
+            suspicious.append(ip)
+
+    return suspicious
+
 
 
 def build_attack_intent_report(lines: list[str]) -> dict:
     """
     Analyze SSH failures to determine what attackers were trying to do.
-    Example output:
+    Returns:
     - attempted usernames
-    - rejected passwords
-    - login methods used
+    - attacker IPs
+    - login methods (MVP: just password attempts)
     """
+    attempted_users = {}
+    attacker_ips = {}
+    methods = {"password": 0}
+
+    for line in lines:
+        data = parse_log_line(line)
+
+        # Only look at failed SSH logins
+        if data.get("action") == "ssh_failed":
+            user = data.get("user")
+            ip = data.get("ip")
+
+            # Count username attempts
+            attempted_users[user] = attempted_users.get(user, 0) + 1
+
+            # Count attacker IP attempts
+            attacker_ips[ip] = attacker_ips.get(ip, 0) + 1
+
+            # Count password login methods (MVP simplifies this)
+            methods["password"] += 1
+
+    return {
+        "attempted_usernames": attempted_users,
+        "attacker_ips": attacker_ips,
+        "login_methods": methods
+    }
 
 
 # -----------------------------
@@ -116,6 +173,33 @@ def analyze_sudo_activity(lines: list[str]) -> dict:
     - commands executed
     - failed sudo attempts (if present)
     """
+    sudo_commands = {}
+    failed_sudo = 0
+
+    for line in lines:
+        data = parse_log_line(line)
+        action = data.get("action")
+
+        # Successful sudo command
+        if action == "sudo_command":
+            user = data.get("user")
+            cmd = data.get("command")
+
+            if user not in sudo_commands:
+                sudo_commands[user] = []
+
+            sudo_commands[user].append(cmd)
+
+        # Failed sudo authentication
+        elif action == "sudo_fail":
+            failed_sudo += 1
+
+    return {
+        "total_sudo_commands": sum(len(v) for v in sudo_commands.values()),
+        "commands_per_user": sudo_commands,
+        "failed_sudo_attempts": failed_sudo,
+    }
+
 
 
 # -----------------------------
@@ -145,4 +229,9 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
 def main():
     """Main entrypoint: parse args, run correct analysis, format output."""
+
+
+
+
+
 
