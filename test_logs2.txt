@@ -1,0 +1,4 @@
+Jan 12 11:01:10 server sudo:   user1 : TTY=pts/0 ; PWD=/home/user1 ; COMMAND=/usr/bin/apt update
+Jan 12 11:02:15 server sudo:   user2 : TTY=pts/1 ; PWD=/home/user2 ; COMMAND=/usr/bin/systemctl restart ssh
+Jan 12 11:03:25 server sudo:   user1 : TTY=pts/0 ; PWD=/home/user1 ; COMMAND=/usr/bin/cat /etc/shadow
+Jan 12 11:05:12 server sudo: pam_unix(sudo:auth): authentication failure; logname=user2 uid=1001 euid=0 tty=/dev/pts/1 ruser=user2 rhost=  user2

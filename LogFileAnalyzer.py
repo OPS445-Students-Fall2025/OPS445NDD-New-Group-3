@@ -444,4 +444,39 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
 def main():
     """Main entrypoint: parse args, run correct analysis, format output."""
+    
+    parser = build_arg_parser()
+    args = parser.parse_args()
+
+    lines = read_log_file(args.logfile)
+
+    if args.command == "ssh":
+        report = {
+            "failed_ssh_attempts": count_failed_ssh_attempts(lines),
+            "suspicious_ips": detect_strange_ip_logins(lines),
+            "attack_intent": build_attack_intent_report(lines),
+        }
+        print_summary(report)
+
+    elif args.command == "sudo":
+        report = analyze_sudo_activity(lines)
+        print_summary(report)
+
+    elif args.command == "summary":
+        report = {
+            "failed_ssh_attempts": count_failed_ssh_attempts(lines),
+            "suspicious_ips": detect_strange_ip_logins(lines),
+            "attack_intent": build_attack_intent_report(lines),
+            "sudo_activity": analyze_sudo_activity(lines),
+        }
+        print_summary(report)
+
+
+if __name__ == "__main__":
+    main()
+
+
+
+
+
 
