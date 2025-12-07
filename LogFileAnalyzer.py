@@ -18,8 +18,6 @@ def read_log_file(path: str) -> list[str]:
         # simple error message if file is missing
         print(f"Error: cannot open log file '{path}'")
     return lines
-def read_log_file(path: str) -> list[str]:
-    """Load the log file and return all lines."""
 
 
 def parse_log_line(line: str) -> dict:
@@ -165,10 +163,9 @@ def build_attack_intent_report(lines: list[str]) -> dict:
     }
 
 
-
 # -----------------------------
 # SUDOERS LOG ANALYSIS
-#------------------------------
+# -----------------------------
 
 def analyze_sudo_activity(lines: list[str]) -> dict:
     """
@@ -299,7 +296,7 @@ def print_summary(report: dict) -> None:
 def write_output(report: dict, path: str) -> None:
     """Save the full report to a file.
 
-    How this will work:
+    Behavior:
       - If path ends with '.json', write JSON (pretty printed).
       - Otherwise write a human-readable textual report (same style as print_summary).
     """
@@ -393,12 +390,6 @@ def write_output(report: dict, path: str) -> None:
             f.write("\n".join(lines) + "\n")
     except Exception as e:
         print(f"Error writing report to {path}: {e}")
-def print_summary(report: dict) -> None:
-    """Display final results in a clean, readable format."""
-
-
-def write_output(report: dict, path: str) -> None:
-    """Save the full report or suspicious IP list to a file."""
 
 
 # -----------------------------
@@ -413,6 +404,9 @@ def build_arg_parser() -> argparse.ArgumentParser:
       - ssh     : analyze ssh-related entries
       - sudo    : analyze sudo-related entries
       - summary : full system report (both)
+    Common options:
+      --logfile or -l  : path to the log file (default: /var/log/syslog)
+      --out or -o      : output file (optional). If ends with .json, JSON will be written.
     """
     parser = argparse.ArgumentParser(
         prog="log-analyzer",
@@ -447,10 +441,40 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
     return parser
 
-    
 
 def main():
     """Main entrypoint: parse args, run correct analysis, format output."""
+    
+    parser = build_arg_parser()
+    args = parser.parse_args()
+
+    lines = read_log_file(args.logfile)
+
+    if args.command == "ssh":
+        report = {
+            "failed_ssh_attempts": count_failed_ssh_attempts(lines),
+            "suspicious_ips": detect_strange_ip_logins(lines),
+            "attack_intent": build_attack_intent_report(lines),
+        }
+        print_summary(report)
+
+    elif args.command == "sudo":
+        report = analyze_sudo_activity(lines)
+        print_summary(report)
+
+    elif args.command == "summary":
+        report = {
+            "failed_ssh_attempts": count_failed_ssh_attempts(lines),
+            "suspicious_ips": detect_strange_ip_logins(lines),
+            "attack_intent": build_attack_intent_report(lines),
+            "sudo_activity": analyze_sudo_activity(lines),
+        }
+        print_summary(report)
+
+
+if __name__ == "__main__":
+    main()
+
 
 
 
