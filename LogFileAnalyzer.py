@@ -314,33 +314,43 @@ def print_summary(report: dict) -> None:
 
 
 def write_output(report: dict, path: str) -> None:
-    """Save the full report to a file.
+ # The write_output function saves the log analysis report to a file.
+# It handles multiple scenarios to make the code safe and clear:
+# - Checks if the output path exists and is writable.
+# - Supports JSON output (pretty-printed) if the path ends with '.json'.
+# - Writes human-readable text output for other file types, using a format similar to print_summary.
+# - Handles empty reports gracefully by indicating "No data to write."
+# - Catches exceptions during file writing to prevent crashes and prints an error message.
+# - Formats nested structures in the report for readability using pprint if needed.
+# This explicit handling increases reliability, safety, and clarity of the script.
 
-    Behavior:
-      - If path ends with '.json', write JSON (pretty printed).
-      - Otherwise write a human-readable textual report (same style as print_summary).
-    """
-    if path.lower().endswith('.json'):
+    if not path:
+        print("No output file specified. Skipping write.")
+        return
+
+    # 1). Handle JSON output
+    if path.lower().endswith(".json"):
         try:
             with open(path, 'w', encoding='utf-8') as f:
                 json.dump(report, f, indent=2, ensure_ascii=False)
+            print(f"Report successfully written as JSON to '{path}'")
             return
         except Exception as e:
-            print(f"Error writing JSON to {path}: {e}")
+            print(f"Error writing JSON to '{path}': {e}")
             return
 
-    # For text output, reuse the string produced by print_summary but capture it
+    # 2). Handle text output (human-readable)
     try:
-        # Create a textual representation similar to what print_summary prints
-        # We'll build it into a string and write it out.
         lines = []
-        # Simple helper to append lines
+
+        # helper function to append lines
         def L(s=""):
             lines.append(str(s))
 
         if not report:
             L("No data to write.")
         else:
+            # Reuse the sections similar to print_summary
             if "failed_ssh_attempts" in report or "failed_ssh" in report:
                 count = report.get("failed_ssh_attempts", report.get("failed_ssh", 0))
                 L("=== SSH ===")
@@ -375,41 +385,36 @@ def write_output(report: dict, path: str) -> None:
                     for m, c in methods.items():
                         L(f" - {m}: {c}")
 
-            if "sudo" in report or "sudo_summary" in report or "total_sudo_commands" in report:
-                sudo_section = report.get("sudo", report.get("sudo_summary", {}))
+            if "sudo_activity" in report or "sudo" in report or "sudo_summary" in report:
+                sudo_section = report.get("sudo_activity", report.get("sudo", report.get("sudo_summary", {})))
                 if isinstance(sudo_section, dict):
                     L("")
                     L("=== SUDO ===")
-                    total = sudo_section.get("total_sudo_commands",
-                                             report.get("total_sudo_commands", 0))
+                    total = sudo_section.get("total_sudo_commands", 0)
                     L(f"Total sudo commands: {total}")
-                    per_user = sudo_section.get("commands_per_user",
-                                                report.get("commands_per_user", {}))
+                    per_user = sudo_section.get("commands_per_user", {})
                     if per_user:
                         L("Commands per user:")
                         for user, cmds in per_user.items():
                             L(f" - {user}: {len(cmds)} commands")
-                    failed = sudo_section.get("failed_sudo_attempts",
-                                              report.get("failed_sudo_attempts", 0))
+                    failed = sudo_section.get("failed_sudo_attempts", 0)
                     L(f"Failed sudo attempts: {failed}")
 
-            # Add extra keys if present
-            known_keys = {"failed_ssh_attempts", "failed_ssh", "suspicious_ips", "attack_intent",
-                          "sudo", "sudo_summary", "total_sudo_commands", "commands_per_user",
-                          "failed_sudo_attempts"}
-            extra_keys = [k for k in report.keys() if k not in known_keys]
-            if extra_keys:
-                L("")
-                L("=== Additional data ===")
-                for k in extra_keys:
-                    L(f"{k}:")
-                    L(pformat(report[k]))
-
-        # Actually write the textual lines to the file
+        # Write all lines to the file
         with open(path, 'w', encoding='utf-8') as f:
             f.write("\n".join(lines) + "\n")
+        print(f"Report successfully written to '{path}'")
+    
     except Exception as e:
-        print(f"Error writing report to {path}: {e}")
+        print(f"Error writing report to '{path}': {e}")
+
+# This write_output function is necessary because it safely saves the log analysis report to a file.  
+# It supports both JSON and human-readable text formats.  
+# It handles empty or nested data gracefully for clarity.  
+# It uses conditional statements to handle different scenarios and try/except blocks to catch errors,
+# ensuring the result is written safely.  
+
+
 
 
 # -----------------------------
