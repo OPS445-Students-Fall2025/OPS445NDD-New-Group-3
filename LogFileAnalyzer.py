@@ -543,5 +543,20 @@ if __name__ == "__main__":
 
 
 
+# -----------------------------------------------------------------------------
+# REFERENCES FOR FUNCTIONS 
+# --[PRINT_SUMMARY, 
+# --WRITE_OUTPUT AND 
+# --BUILD_ARG_PARSER()]
+# -----------------------------------------------------------------------------
+
+# Python Software Foundation. (2024). argparse — Parser for command-line options. 
+#     https://docs.python.org/3/library/argparse.html
+
+# Pozo Ramos, L. (2023). Build command-line interfaces with argparse. Real Python. 
+#     https://realpython.com/command-line-interfaces-python-argparse/
+
+# Python Software Foundation. (2024). pprint — Data pretty printer.
+#     https://docs.python.org/3/library/pprint.html
 
 
