@@ -204,93 +204,113 @@ def analyze_sudo_activity(lines: list[str]) -> dict:
 
 
 
-# -----------------------------
-# OUTPUT / UTILITIES
-# -----------------------------
+# ---------------------------------------------------------------
+# THIS SECTION DEFINES FUNCTION TO DISPLAY THE OUTPUT / UTILITIES
+# ---------------------------------------------------------------
 
 
 def print_summary(report: dict) -> None:
-    """Display final results in a clean, readable format.
+    #The above function prints a human-readable summary of the analysis report.
+    #This function does not return anything. It simply looks through the keys stored in the 'report' 
+    #dictionary and prints the information in a clean and well-organized format. Some of the expected keys inside 
+    #report are: 'failed ssh attempts', 'suspicious_ips', 'attack_intent', 'sudo_summary', 'total_sudo_commands',
+    #This function checks for each section one by one before printing. 
 
-    This function is defensive: it inspects common keys that may be present
-    in the report dict and prints them in a human-friendly way. For anything
-    unexpected it falls back to a pretty-printed view of the whole dict.
-    """
-    if not report:
-        print("No data to display.")
-        return
+    print("\n===== SYSTEM LOG ANALYSIS SUMMARY =====\n")
 
-    # Human-friendly printing for common sections
-    # SSH summary
-    if "failed_ssh_attempts" in report or "failed_ssh" in report:
-        count = report.get("failed_ssh_attempts", report.get("failed_ssh", 0))
-        print("=== SSH ===")
-        print(f"Failed SSH attempts: {count}")
+    # 1). FAILED SSH ATTEMPTS
 
-    if "suspicious_ips" in report:
-        ips = report.get("suspicious_ips", [])
-        print("Suspicious IPs:")
+    failed_attempts = report.get("failed_ssh_attempts")
+    if failed_attempts is not None:
+        print(f"Failed SSH Attempts: {failed_attempts}\n")
+
+    # 2). SUSPICIOUS IP ADDRESSES
+   
+    suspicious_ips = report.get("suspicious_ips")
+    if suspicious_ips:
+        print("Suspicious IP Addresses Detected:")
+        for ip in suspicious_ips:
+            print(f"  - {ip}")
+        print() 
+
+    
+    # 3). ATTACK INTENT REPORT (username guesses, IPs, methods)
+    
+    attack_intent = report.get("attack_intent")
+    if attack_intent:
+        print("Attacker Intent Breakdown:")
+
+        # attempted usernames
+        usernames = attack_intent.get("attempted_usernames", {})
+        if usernames:
+            print("  Attempted Usernames:")
+            for user, count in usernames.items():
+                print(f"    {user}: {count} times")
+
+        # attacker IPs
+        ips = attack_intent.get("attacker_ips", {})
         if ips:
-            for ip in ips:
-                print(f" - {ip}")
-        else:
-            print(" - none found")
+            print("\n  Attacker IP Addresses:")
+            for ip, count in ips.items():
+                print(f"    {ip}: {count} attempts")
 
-    if "attack_intent" in report:
-        ai = report["attack_intent"]
-        print("\n=== Attack Intent Report ===")
-        # attempted_usernames is expected to be a dict username->count
-        users = ai.get("attempted_usernames", {})
-        if users:
-            print("Attempted usernames:")
-            for u, c in sorted(users.items(), key=lambda x: -x[1]):
-                print(f" - {u}: {c}")
-        ips = ai.get("attacker_ips", {})
-        if ips:
-            print("Attacker IPs:")
-            for ip, c in sorted(ips.items(), key=lambda x: -x[1]):
-                print(f" - {ip}: {c}")
-        methods = ai.get("login_methods", {})
+        # login methods
+        methods = attack_intent.get("login_methods", {})
         if methods:
-            print("Login methods:")
-            for m, c in methods.items():
-                print(f" - {m}: {c}")
+            print("\n  Login Methods Used:")
+            for method, count in methods.items():
+                print(f"    {method}: {count}")
 
-    # Sudo summary
-    if "sudo" in report or "sudo_summary" in report or "total_sudo_commands" in report:
-        sudo_section = report.get("sudo", report.get("sudo_summary", {}))
-        # If it's a dict produced by analyze_sudo_activity, print fields
-        if isinstance(sudo_section, dict):
-            print("\n=== SUDO ===")
-            total = sudo_section.get("total_sudo_commands",
-                                     report.get("total_sudo_commands", 0))
-            print(f"Total sudo commands: {total}")
-            per_user = sudo_section.get("commands_per_user",
-                                        report.get("commands_per_user", {}))
-            if per_user:
-                print("Commands per user:")
-                for user, cmds in per_user.items():
-                    print(f" - {user}: {len(cmds)} commands")
-            failed = sudo_section.get("failed_sudo_attempts",
-                                      report.get("failed_sudo_attempts", 0))
-            print(f"Failed sudo attempts: {failed}")
+        print()  
 
-    # If nothing matched above, or there are extra keys, pretty-print the whole report
-    known_keys = {"failed_ssh_attempts", "failed_ssh", "suspicious_ips", "attack_intent",
-                  "sudo", "sudo_summary", "total_sudo_commands", "commands_per_user",
-                  "failed_sudo_attempts"}
-    extra_keys = [k for k in report.keys() if k not in known_keys]
-    if extra_keys:
-        print("\n=== Additional data ===")
-        for k in extra_keys:
-            print(f"{k}:")
-            # pretty format nested structures for readability
-            print(pformat(report[k], indent=4))
-    # If none of the above applied at all, do a final pretty print of the whole dict
-    # (useful for debugging and unexpected report formats)
-    if not (set(report.keys()) & known_keys) and not extra_keys:
-        print("Full report:")
-        print(pformat(report, indent=4))
+    
+    # 4). SUDO SUMMARY (commands and failures)
+    
+    sudo_summary = report.get("sudo_summary")
+    if sudo_summary:
+        print("Sudo Activity Summary:")
+
+        total_cmds = sudo_summary.get("total_sudo_commands", 0)
+        print(f"  Total Sudo Commands: {total_cmds}")
+
+        failed_sudo = sudo_summary.get("failed_sudo_attempts", 0)
+        print(f"  Failed Sudo Attempts: {failed_sudo}")
+
+        commands_per_user = sudo_summary.get("commands_per_user", {})
+        if commands_per_user:
+            print("\n  Commands Per User:")
+            for user, commands in commands_per_user.items():
+                print(f"    {user}:")
+                for cmd in commands:
+                    print(f"      - {cmd}")
+
+        print() 
+
+    
+    # 5). ANY EXTRA KEYS THE SCRIPT MAY ADD LATER
+    
+    known_keys = {
+        "failed_ssh_attempts",
+        "suspicious_ips",
+        "attack_intent",
+        "sudo_summary",
+        "total_sudo_commands",
+    }
+
+    # Print anything extra for future-proofing
+    for key, value in report.items():
+        if key not in known_keys:
+            print(f"{key}: {value}")
+            print()
+
+    print("========== END OF SUMMARY ==========\n")
+
+#KEYNOTE: In order for this function to be executed properly, print_summary(report) has to take 
+#the report dictionary produced by the analysis functions(count_failed_ssh_attempts, detect_strange_ip_logins, 
+#build_attack_intent_report, analyze_sudo_activity)and displays the results in a clean, readable format 
+#for SSH and sudo activity.
+
+
 
 
 def write_output(report: dict, path: str) -> None:
