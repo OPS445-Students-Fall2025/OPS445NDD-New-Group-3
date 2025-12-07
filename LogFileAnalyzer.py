@@ -417,27 +417,44 @@ def write_output(report: dict, path: str) -> None:
 
 
 
-# -----------------------------
-# ARGPARSE SETUP
-# -----------------------------
+# ---------------------------------------------------------------------------------
+# THIS SECTION CREATES AND CONFIGURES AN ARGPARSER TO HANDLE COMMAND LINE ARGUMENTS
+# ---------------------------------------------------------------------------------
 
 def build_arg_parser() -> argparse.ArgumentParser:
-    """
-    Build the argparse parser and subcommands.
+# This newly modified build_arg_parser function creates and returns an ArgumentParser
+# that understands all command-line options the script accepts.
 
-    Subcommands:
-      - ssh     : analyze ssh-related entries
-      - sudo    : analyze sudo-related entries
-      - summary : full system report (both)
-    Common options:
-      --logfile or -l  : path to the log file (default: /var/log/syslog)
-      --out or -o      : output file (optional). If ends with .json, JSON will be written.
-    """
+# What this function does:
+# it Creates a main parser with a short description so users can run `-h` to see help.
+# it Adds two global options used by all commands:
+#    - `--logfile` to choose which log file to analyze.
+#    - `--out` to choose where the output should be saved.
+# it Adds subparsers (ssh, sudo, summary), each representing a different action.
+#    Each sub-command can have its own options while still sharing the global ones.
+# it Sets a default command (`summary`) so the script still works when the user
+# provides arguments like `--logfile` but forgets to type a sub-command.
+
+# This modified script fixes the issue of "arguments present but not working" by ensuring
+# the parser always has a valid command to run. Previously, when no sub-command was given,
+# `args.command` became None, causing the script to ignore all provided arguments. By
+# setting `command="summary"` as the default, the parser now processes options correctly
+# even when the user forgets to specify a sub-command.
+
+# We still use subparsers because they keep the script organized by giving each mode
+# (ssh, sudo, summary) its own set of options. This makes the command-line interface
+# clearer, the help messages easier to understand, and the tool more professional.
+# Subparsers are appropriate here — the issue wasn’t their use, but the missing default
+# command. By adding a safe default, the subparsers now work exactly as intended.
+
+
+    # 1). Creates the top-level parser with a short description
     parser = argparse.ArgumentParser(
         prog="log-analyzer",
         description="Simple syslog analyzer for SSH and sudo activity"
     )
 
+    # 2). Common/global options (apply regardless of chosen sub-command)
     parser.add_argument(
         "-l", "--logfile",
         default="/var/log/syslog",
@@ -449,20 +466,43 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="Optional output file to save the report (if ends with .json will produce JSON)"
     )
 
-    subparsers = parser.add_subparsers(dest="command", required=False,
-                                       help="Sub-command to run. If omitted, 'summary' is assumed.")
+    # 3). Create subparsers for distinct commands (ssh, sudo, summary)
+    # We did not set required=True here for maximum compatibility.
+    subparsers = parser.add_subparsers(dest="command", help="Sub-command to run")
 
-    # ssh subcommand
+    
+    # ssh sub-command: analyze SSH failed attempts and suspicious IPs
+    
     ssh_p = subparsers.add_parser("ssh", help="Analyze SSH failed attempts and suspicious IPs")
-    ssh_p.add_argument("-t", "--top", type=int, default=10,
-                       help="Show top N IPs/usernames (not yet used by core functions)")
+    ssh_p.add_argument(
+        "-t", "--top",
+        type=int,
+        default=10,
+        help="Show top N IPs/usernames (default: 10)"
+    )
+    # Keynote: ssh subcommand here will use the global --logfile and --out options too.
 
-    # sudo subcommand
+   
+    # sudo sub-command: analyze sudo activity
+   
     sudo_p = subparsers.add_parser("sudo", help="Analyze sudo activity")
-    sudo_p.add_argument("-u", "--user", default=None, help="Filter sudo report to a single user")
+    sudo_p.add_argument(
+        "-u", "--user",
+        default=None,
+        help="Filter sudo report to a single user (optional)"
+    )
 
-    # summary subcommand
+    
+    # summary sub-command: combined report (explicit if user wants it)
+    
     subparsers.add_parser("summary", help="Produce a combined system summary")
+
+    
+    # Default behavior:
+    # If user does not provide any sub-command, treat it as 'summary'.
+    # This will avoid args.command from being None and makes top-level options work.
+    
+    parser.set_defaults(command="summary")
 
     return parser
 
