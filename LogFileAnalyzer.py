@@ -508,8 +508,18 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
 
 def main():
-    """Main entrypoint: parse args, run correct analysis, format output."""
-    
+# This is the main entrypoint of the script. It orchestrates reading logs, analyzing them, 
+# and displaying or saving reports. The function works as follows:
+# 1. Builds the argument parser and parses command-line arguments.
+# 2. Reads the log file specified by the user (or default /var/log/syslog) using read_log_file().
+# 3. Checks which subcommand was invoked: 'ssh', 'sudo', or 'summary'.
+# 4. Depending on the subcommand:
+#     - 'ssh': builds a report including failed SSH attempts, suspicious IPs, and attack intent.
+#     - 'sudo': builds a report summarizing sudo activity.
+#     - 'summary': builds a combined report for both SSH and sudo activity.
+# 5. Calls print_summary() to display the report to the user in a clean, readable format.
+# This function is executed when the script is run directly and ensures the workflow operates
+# correctly based on user input.
     parser = build_arg_parser()
     args = parser.parse_args()
 
@@ -542,13 +552,15 @@ if __name__ == "__main__":
 
 
 
-
 # -----------------------------------------------------------------------------
 # REFERENCES FOR FUNCTIONS 
 # --[PRINT_SUMMARY, 
 # --WRITE_OUTPUT AND 
 # --BUILD_ARG_PARSER()]
+# Student: OJI ONYEDIKACHI CHRISTOPHER
+# Student ID: 133383224
 # -----------------------------------------------------------------------------
+
 
 # Python Software Foundation. (2024). argparse — Parser for command-line options. 
 #     https://docs.python.org/3/library/argparse.html
