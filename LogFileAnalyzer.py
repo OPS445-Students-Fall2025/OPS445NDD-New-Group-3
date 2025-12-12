@@ -113,37 +113,37 @@ def count_failed_ssh_attempts(lines: list[str]) -> int:
 #     https://docs.python.org/3/library/stdtypes.html#string-methods
 
 
+
 def detect_strange_ip_logins(lines: list[str]) -> list[str]:
-    """
-    Identify unusual or repeated IPs attempting login.
-    Return a list of suspicious IP addresses.
-    """
+# This function analyzes a list of log lines to identify potentially suspicious IP addresses.
+# It works by:
+# 1. Iterating through each log line and parsing it with parse_log_line().
+# 2. Collecting the IP addresses found in each line and counting how many times each IP appears.
+# 3. Identifying suspicious IPs using two criteria:
+#    a) Public/external IP addresses (not in private ranges 10.*, 172.*, or 192.168.*) are flagged.
+#    b) Internal/private IP addresses that appear frequently (more than 10 times) are flagged as suspicious.
+# 4. Returning a list of these suspicious IP addresses.
+# This function helps detect unusual login attempts or potential attacks on the system.
+    
     ip_counts = {}
 
-    # Count every IP we see
+    # Count occurrences of each IP found in the logs
     for line in lines:
         data = parse_log_line(line)
-
         ip = data.get("ip")
         if not ip:
             continue
-
         ip_counts[ip] = ip_counts.get(ip, 0) + 1
 
     suspicious = []
 
-    # Analyze frequency + private vs public ranges
+    # Determine which IPs are suspicious based on frequency and private/public ranges
     for ip, count in ip_counts.items():
-        # Flag external/public IPs (all suspicious)
-        if not (
-            ip.startswith("10.") or
-            ip.startswith("192.168.") or
-            ip.startswith("172.")
-        ):
+        # External/public IPs are always suspicious
+        if not (ip.startswith("10.") or ip.startswith("192.168.") or ip.startswith("172.")):
             suspicious.append(ip)
             continue
-
-        # Flag internal IPs that hit too many times
+        # Internal IPs with many login attempts are suspicious
         if count > 10:
             suspicious.append(ip)
 
@@ -152,13 +152,19 @@ def detect_strange_ip_logins(lines: list[str]) -> list[str]:
 
 
 def build_attack_intent_report(lines: list[str]) -> dict:
-    """
-    Analyze SSH failures to determine what attackers were trying to do.
-    Returns:
-    - attempted usernames
-    - attacker IPs
-    - login methods (MVP: just password attempts)
-    """
+# This function analyzes log lines to summarize the intent behind failed SSH login attempts.
+# It returns a dictionary containing:
+# - attempted_usernames: a count of each username attackers tried.
+# - attacker_ips: a count of IP addresses used in failed attempts.
+# - login_methods: a summary of login methods used (currently tracks password attempts).
+#
+# The function works by:
+# 1. Iterating through each log line.
+# 2. Parsing the line using parse_log_line().
+# 3. Checking if the "action" is "ssh_failed" (failed SSH login attempt).
+# 4. Recording the attempted username and IP address counts.
+# 5. Counting the login method used (currently only "password").
+# This allows higher-level reports to understand attacker behavior patterns.
     attempted_users = {}
     attacker_ips = {}
     methods = {"password": 0}
@@ -171,13 +177,15 @@ def build_attack_intent_report(lines: list[str]) -> dict:
             user = data.get("user")
             ip = data.get("ip")
 
-            # Count username attempts
-            attempted_users[user] = attempted_users.get(user, 0) + 1
+            # Count attempted usernames
+            if user:
+                attempted_users[user] = attempted_users.get(user, 0) + 1
 
-            # Count attacker IP attempts
-            attacker_ips[ip] = attacker_ips.get(ip, 0) + 1
+            # Count attacker IPs
+            if ip:
+                attacker_ips[ip] = attacker_ips.get(ip, 0) + 1
 
-            # Count password login methods (MVP simplifies this)
+            # Count password login attempts
             methods["password"] += 1
 
     return {
@@ -187,18 +195,27 @@ def build_attack_intent_report(lines: list[str]) -> dict:
     }
 
 
-# -----------------------------
-# SUDOERS LOG ANALYSIS
-# -----------------------------
+
+# -------------------------------------------------------------
+# THIS SECTION DEFINES A FUNCTION TO ANALYZE SUDOERS ACTIVITIES
+# -------------------------------------------------------------
 
 def analyze_sudo_activity(lines: list[str]) -> dict:
-    """
-    Summarize sudo usage:
-    - number of sudo commands run
-    - users who ran sudo
-    - commands executed
-    - failed sudo attempts (if present)
-    """
+# This function analyzes log lines to summarize sudo command activity.
+# It returns a dictionary containing:
+# - total_sudo_commands: total number of sudo commands executed.
+# - commands_per_user: a dictionary of users and the commands they ran with sudo.
+# - failed_sudo_attempts: number of failed sudo authentication attempts.
+#
+# The function works by:
+# 1. Iterating through each log line.
+# 2. Parsing the line using parse_log_line().
+# 3. Checking the "action" field for sudo-related activity.
+#    - "sudo_command" indicates a successful sudo command.
+#    - "sudo_fail" indicates a failed sudo authentication.
+# 4. Collecting and organizing command information by user and counting failures.
+# This allows higher-level reports to summarize sudo usage and detect possible misuse.
+
     sudo_commands = {}
     failed_sudo = 0
 
@@ -210,11 +227,10 @@ def analyze_sudo_activity(lines: list[str]) -> dict:
         if action == "sudo_command":
             user = data.get("user")
             cmd = data.get("command")
-
             if user not in sudo_commands:
                 sudo_commands[user] = []
-
-            sudo_commands[user].append(cmd)
+            if cmd:
+                sudo_commands[user].append(cmd)
 
         # Failed sudo authentication
         elif action == "sudo_fail":
@@ -595,4 +611,18 @@ if __name__ == "__main__":
 # Python Software Foundation. (2024). pprint — Data pretty printer.
 #     https://docs.python.org/3/library/pprint.html
 
+
+
+# -----------------------------------------------------------------------------
+# REFERENCES FOR FUNCTIONS 
+# --[PRINT_SUMMARY, 
+# --WRITE_OUTPUT AND 
+# --BUILD_ARG_PARSER()]
+# Student: THULANEI ALLEN
+# Student ID: 115659179
+# -----------------------------------------------------------------------------
+# Python Software Foundation. (2024). Data structures — Dictionaries. 
+#     Python.org. https://docs.python.org/3/tutorial/datastructures.html#dictionaries
+# Python Software Foundation. (2024). open() — Open file and return a corresponding file object. 
+#     Python.org. https://docs.python.org/3/library/functions.html#open
 
