@@ -6,29 +6,40 @@ import json
 from pprint import pformat
 
 def read_log_file(path: str) -> list[str]:
-    """Load the log file and return all lines."""
+    # Reads a log file and returns all lines in a list.
+    # Each line is stripped of the newline at the end.
+    # Added error handling so the function doesn’t crash if the file doesn't exist
+    # or if there are permission issues.
+
     lines = []
+
     try:
-        # open the log file and read it line by line
-        with open(path, 'r', encoding='utf-8', errors='ignore') as f:
+        with open(path, "r", encoding="utf-8", errors="ignore") as f:
             for line in f:
-                # remove the newline at the end
-                lines.append(line.rstrip('\n'))
+                lines.append(line.rstrip("\n"))
+
     except FileNotFoundError:
-        # simple error message if file is missing
-        print(f"Error: cannot open log file '{path}'")
+        print(f"Error: log file not found: '{path}'")
+
+    except Exception as e:
+        # Catches permission errors, I/O errors, etc.
+        print(f"Error reading log file '{path}': {e}")
+
     return lines
 
 
+
 def parse_log_line(line: str) -> dict:
-    """
-    Extract useful fields from a log line:
-    - timestamp
-    - service (sshd, sudo, etc.)
-    - message
-    - IP address (if any)
-    - action (e.g., failed login, sudo command)
-    """
+    # Takes one log line and extracts useful info from it.
+    # Returns a dictionary with:
+    # - timestamp (first 3 fields)
+    # - service name (ex: sshd, sudo)
+    # - message (everything after the first ':')
+    # - ip address (if found)
+    # - action category (FAILED_SSH, SUCCESS_SSH, SUDO, OTHER)
+    #
+    # This helps us standardize syslog lines so the other functions can work easily.
+
     info = {
         "timestamp": "",
         "service": "",
@@ -38,32 +49,30 @@ def parse_log_line(line: str) -> dict:
     }
 
     parts = line.split()
-    # basic check so we don't crash on weird/short lines
+    # If a line is too short, it's probably not a real log entry
     if len(parts) < 5:
         return info
 
-    # typical syslog layout:
-    # Month Day Time Host Service: message...
-    # ex: "Jan 10 12:34:56 myhost sshd[1234]: Failed password ..."
+    # Basic syslog format → Month Day Time
     info["timestamp"] = " ".join(parts[0:3])
 
-    # service part usually something like "sshd[1234]:"
+    # Extract service name (ex: sshd[1234]: → sshd)
     service_part = parts[4]
     service_name = service_part.split(':')[0]
     if '[' in service_name:
         service_name = service_name.split('[')[0]
     info["service"] = service_name
 
-    # message is everything after the first ':' in the line
+    # Capture everything after the first colon as the "message"
     if ':' in line:
         info["message"] = line.split(':', 1)[1].strip()
 
-    # try to find an IPv4 address in the line
+    # Simple IPv4 detection
     ip_match = re.search(r'(\d{1,3}\.){3}\d{1,3}', line)
     if ip_match:
         info["ip"] = ip_match.group(0)
 
-    # decide what kind of action this is
+    # Classify the type of event
     msg_lower = info["message"].lower()
     if service_name == "sshd" and "failed password" in msg_lower:
         info["action"] = "FAILED_SSH"
@@ -74,19 +83,34 @@ def parse_log_line(line: str) -> dict:
 
     return info
 
-
-# -----------------------------
+# -----------------------------------------------------
 # SSH ANALYSIS FUNCTIONS
-# -----------------------------
+# -----------------------------------------------------
 
 def count_failed_ssh_attempts(lines: list[str]) -> int:
-    """Return total number of failed SSH login attempts."""
+    # Counts how many failed SSH login attempts appear in the log.
+    # Uses parse_log_line() to detect entries marked as FAILED_SSH.
+
     count = 0
     for line in lines:
         data = parse_log_line(line)
         if data.get("action") == "FAILED_SSH":
             count += 1
+
     return count
+
+# -----------------------------------------------------
+# REFERENCES 
+# Student: MEHRSHAD SAEIDI
+# Student ID: 126073220
+# -----------------------------------------------------
+
+# Python Software Foundation. (2024). open() — Open file and return a corresponding file object.
+#     https://docs.python.org/3/library/functions.html#open
+
+# Python Software Foundation. (2024). string methods — str.split(), str.strip(), rstrip().
+#     Used throughout the parsing logic to process log lines.
+#     https://docs.python.org/3/library/stdtypes.html#string-methods
 
 
 def detect_strange_ip_logins(lines: list[str]) -> list[str]:
