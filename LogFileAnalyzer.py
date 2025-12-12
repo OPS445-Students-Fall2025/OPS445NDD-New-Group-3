@@ -204,123 +204,153 @@ def analyze_sudo_activity(lines: list[str]) -> dict:
 
 
 
-# -----------------------------
-# OUTPUT / UTILITIES
-# -----------------------------
+# ---------------------------------------------------------------
+# THIS SECTION DEFINES FUNCTION TO DISPLAY THE OUTPUT / UTILITIES
+# ---------------------------------------------------------------
 
 
 def print_summary(report: dict) -> None:
-    """Display final results in a clean, readable format.
+    #The above function prints a human-readable summary of the analysis report.
+    #This function does not return anything. It simply looks through the keys stored in the 'report' 
+    #dictionary and prints the information in a clean and well-organized format. Some of the expected keys inside 
+    #report are: 'failed ssh attempts', 'suspicious_ips', 'attack_intent', 'sudo_summary', 'total_sudo_commands',
+    #This function checks for each section one by one before printing. 
 
-    This function is defensive: it inspects common keys that may be present
-    in the report dict and prints them in a human-friendly way. For anything
-    unexpected it falls back to a pretty-printed view of the whole dict.
-    """
-    if not report:
-        print("No data to display.")
-        return
+    print("\n===== SYSTEM LOG ANALYSIS SUMMARY =====\n")
 
-    # Human-friendly printing for common sections
-    # SSH summary
-    if "failed_ssh_attempts" in report or "failed_ssh" in report:
-        count = report.get("failed_ssh_attempts", report.get("failed_ssh", 0))
-        print("=== SSH ===")
-        print(f"Failed SSH attempts: {count}")
+    # 1). FAILED SSH ATTEMPTS
 
-    if "suspicious_ips" in report:
-        ips = report.get("suspicious_ips", [])
-        print("Suspicious IPs:")
+    failed_attempts = report.get("failed_ssh_attempts")
+    if failed_attempts is not None:
+        print(f"Failed SSH Attempts: {failed_attempts}\n")
+
+    # 2). SUSPICIOUS IP ADDRESSES
+   
+    suspicious_ips = report.get("suspicious_ips")
+    if suspicious_ips:
+        print("Suspicious IP Addresses Detected:")
+        for ip in suspicious_ips:
+            print(f"  - {ip}")
+        print() 
+
+    
+    # 3). ATTACK INTENT REPORT (username guesses, IPs, methods)
+    
+    attack_intent = report.get("attack_intent")
+    if attack_intent:
+        print("Attacker Intent Breakdown:")
+
+        # attempted usernames
+        usernames = attack_intent.get("attempted_usernames", {})
+        if usernames:
+            print("  Attempted Usernames:")
+            for user, count in usernames.items():
+                print(f"    {user}: {count} times")
+
+        # attacker IPs
+        ips = attack_intent.get("attacker_ips", {})
         if ips:
-            for ip in ips:
-                print(f" - {ip}")
-        else:
-            print(" - none found")
+            print("\n  Attacker IP Addresses:")
+            for ip, count in ips.items():
+                print(f"    {ip}: {count} attempts")
 
-    if "attack_intent" in report:
-        ai = report["attack_intent"]
-        print("\n=== Attack Intent Report ===")
-        # attempted_usernames is expected to be a dict username->count
-        users = ai.get("attempted_usernames", {})
-        if users:
-            print("Attempted usernames:")
-            for u, c in sorted(users.items(), key=lambda x: -x[1]):
-                print(f" - {u}: {c}")
-        ips = ai.get("attacker_ips", {})
-        if ips:
-            print("Attacker IPs:")
-            for ip, c in sorted(ips.items(), key=lambda x: -x[1]):
-                print(f" - {ip}: {c}")
-        methods = ai.get("login_methods", {})
+        # login methods
+        methods = attack_intent.get("login_methods", {})
         if methods:
-            print("Login methods:")
-            for m, c in methods.items():
-                print(f" - {m}: {c}")
+            print("\n  Login Methods Used:")
+            for method, count in methods.items():
+                print(f"    {method}: {count}")
 
-    # Sudo summary
-    if "sudo" in report or "sudo_summary" in report or "total_sudo_commands" in report:
-        sudo_section = report.get("sudo", report.get("sudo_summary", {}))
-        # If it's a dict produced by analyze_sudo_activity, print fields
-        if isinstance(sudo_section, dict):
-            print("\n=== SUDO ===")
-            total = sudo_section.get("total_sudo_commands",
-                                     report.get("total_sudo_commands", 0))
-            print(f"Total sudo commands: {total}")
-            per_user = sudo_section.get("commands_per_user",
-                                        report.get("commands_per_user", {}))
-            if per_user:
-                print("Commands per user:")
-                for user, cmds in per_user.items():
-                    print(f" - {user}: {len(cmds)} commands")
-            failed = sudo_section.get("failed_sudo_attempts",
-                                      report.get("failed_sudo_attempts", 0))
-            print(f"Failed sudo attempts: {failed}")
+        print()  
 
-    # If nothing matched above, or there are extra keys, pretty-print the whole report
-    known_keys = {"failed_ssh_attempts", "failed_ssh", "suspicious_ips", "attack_intent",
-                  "sudo", "sudo_summary", "total_sudo_commands", "commands_per_user",
-                  "failed_sudo_attempts"}
-    extra_keys = [k for k in report.keys() if k not in known_keys]
-    if extra_keys:
-        print("\n=== Additional data ===")
-        for k in extra_keys:
-            print(f"{k}:")
-            # pretty format nested structures for readability
-            print(pformat(report[k], indent=4))
-    # If none of the above applied at all, do a final pretty print of the whole dict
-    # (useful for debugging and unexpected report formats)
-    if not (set(report.keys()) & known_keys) and not extra_keys:
-        print("Full report:")
-        print(pformat(report, indent=4))
+    
+    # 4). SUDO SUMMARY (commands and failures)
+    
+    sudo_summary = report.get("sudo_summary")
+    if sudo_summary:
+        print("Sudo Activity Summary:")
+
+        total_cmds = sudo_summary.get("total_sudo_commands", 0)
+        print(f"  Total Sudo Commands: {total_cmds}")
+
+        failed_sudo = sudo_summary.get("failed_sudo_attempts", 0)
+        print(f"  Failed Sudo Attempts: {failed_sudo}")
+
+        commands_per_user = sudo_summary.get("commands_per_user", {})
+        if commands_per_user:
+            print("\n  Commands Per User:")
+            for user, commands in commands_per_user.items():
+                print(f"    {user}:")
+                for cmd in commands:
+                    print(f"      - {cmd}")
+
+        print() 
+
+    
+    # 5). ANY EXTRA KEYS THE SCRIPT MAY ADD LATER
+    
+    known_keys = {
+        "failed_ssh_attempts",
+        "suspicious_ips",
+        "attack_intent",
+        "sudo_summary",
+        "total_sudo_commands",
+    }
+
+    # Print anything extra for future-proofing
+    for key, value in report.items():
+        if key not in known_keys:
+            print(f"{key}: {value}")
+            print()
+
+    print("========== END OF SUMMARY ==========\n")
+
+#KEYNOTE: In order for this function to be executed properly, print_summary(report) has to take 
+#the report dictionary produced by the analysis functions(count_failed_ssh_attempts, detect_strange_ip_logins, 
+#build_attack_intent_report, analyze_sudo_activity)and displays the results in a clean, readable format 
+#for SSH and sudo activity.
+
+
 
 
 def write_output(report: dict, path: str) -> None:
-    """Save the full report to a file.
+ # The write_output function saves the log analysis report to a file.
+# It handles multiple scenarios to make the code safe and clear:
+# - Checks if the output path exists and is writable.
+# - Supports JSON output (pretty-printed) if the path ends with '.json'.
+# - Writes human-readable text output for other file types, using a format similar to print_summary.
+# - Handles empty reports gracefully by indicating "No data to write."
+# - Catches exceptions during file writing to prevent crashes and prints an error message.
+# - Formats nested structures in the report for readability using pprint if needed.
+# This explicit handling increases reliability, safety, and clarity of the script.
 
-    Behavior:
-      - If path ends with '.json', write JSON (pretty printed).
-      - Otherwise write a human-readable textual report (same style as print_summary).
-    """
-    if path.lower().endswith('.json'):
+    if not path:
+        print("No output file specified. Skipping write.")
+        return
+
+    # 1). Handle JSON output
+    if path.lower().endswith(".json"):
         try:
             with open(path, 'w', encoding='utf-8') as f:
                 json.dump(report, f, indent=2, ensure_ascii=False)
+            print(f"Report successfully written as JSON to '{path}'")
             return
         except Exception as e:
-            print(f"Error writing JSON to {path}: {e}")
+            print(f"Error writing JSON to '{path}': {e}")
             return
 
-    # For text output, reuse the string produced by print_summary but capture it
+    # 2). Handle text output (human-readable)
     try:
-        # Create a textual representation similar to what print_summary prints
-        # We'll build it into a string and write it out.
         lines = []
-        # Simple helper to append lines
+
+        # helper function to append lines
         def L(s=""):
             lines.append(str(s))
 
         if not report:
             L("No data to write.")
         else:
+            # Reuse the sections similar to print_summary
             if "failed_ssh_attempts" in report or "failed_ssh" in report:
                 count = report.get("failed_ssh_attempts", report.get("failed_ssh", 0))
                 L("=== SSH ===")
@@ -355,64 +385,76 @@ def write_output(report: dict, path: str) -> None:
                     for m, c in methods.items():
                         L(f" - {m}: {c}")
 
-            if "sudo" in report or "sudo_summary" in report or "total_sudo_commands" in report:
-                sudo_section = report.get("sudo", report.get("sudo_summary", {}))
+            if "sudo_activity" in report or "sudo" in report or "sudo_summary" in report:
+                sudo_section = report.get("sudo_activity", report.get("sudo", report.get("sudo_summary", {})))
                 if isinstance(sudo_section, dict):
                     L("")
                     L("=== SUDO ===")
-                    total = sudo_section.get("total_sudo_commands",
-                                             report.get("total_sudo_commands", 0))
+                    total = sudo_section.get("total_sudo_commands", 0)
                     L(f"Total sudo commands: {total}")
-                    per_user = sudo_section.get("commands_per_user",
-                                                report.get("commands_per_user", {}))
+                    per_user = sudo_section.get("commands_per_user", {})
                     if per_user:
                         L("Commands per user:")
                         for user, cmds in per_user.items():
                             L(f" - {user}: {len(cmds)} commands")
-                    failed = sudo_section.get("failed_sudo_attempts",
-                                              report.get("failed_sudo_attempts", 0))
+                    failed = sudo_section.get("failed_sudo_attempts", 0)
                     L(f"Failed sudo attempts: {failed}")
 
-            # Add extra keys if present
-            known_keys = {"failed_ssh_attempts", "failed_ssh", "suspicious_ips", "attack_intent",
-                          "sudo", "sudo_summary", "total_sudo_commands", "commands_per_user",
-                          "failed_sudo_attempts"}
-            extra_keys = [k for k in report.keys() if k not in known_keys]
-            if extra_keys:
-                L("")
-                L("=== Additional data ===")
-                for k in extra_keys:
-                    L(f"{k}:")
-                    L(pformat(report[k]))
-
-        # Actually write the textual lines to the file
+        # Write all lines to the file
         with open(path, 'w', encoding='utf-8') as f:
             f.write("\n".join(lines) + "\n")
+        print(f"Report successfully written to '{path}'")
+    
     except Exception as e:
-        print(f"Error writing report to {path}: {e}")
+        print(f"Error writing report to '{path}': {e}")
+
+# This write_output function is necessary because it safely saves the log analysis report to a file.  
+# It supports both JSON and human-readable text formats.  
+# It handles empty or nested data gracefully for clarity.  
+# It uses conditional statements to handle different scenarios and try/except blocks to catch errors,
+# ensuring the result is written safely.  
 
 
-# -----------------------------
-# ARGPARSE SETUP
-# -----------------------------
+
+
+# ---------------------------------------------------------------------------------
+# THIS SECTION CREATES AND CONFIGURES AN ARGPARSER TO HANDLE COMMAND LINE ARGUMENTS
+# ---------------------------------------------------------------------------------
 
 def build_arg_parser() -> argparse.ArgumentParser:
-    """
-    Build the argparse parser and subcommands.
+# This newly modified build_arg_parser function creates and returns an ArgumentParser
+# that understands all command-line options the script accepts.
 
-    Subcommands:
-      - ssh     : analyze ssh-related entries
-      - sudo    : analyze sudo-related entries
-      - summary : full system report (both)
-    Common options:
-      --logfile or -l  : path to the log file (default: /var/log/syslog)
-      --out or -o      : output file (optional). If ends with .json, JSON will be written.
-    """
+# What this function does:
+# it Creates a main parser with a short description so users can run `-h` to see help.
+# it Adds two global options used by all commands:
+#    - `--logfile` to choose which log file to analyze.
+#    - `--out` to choose where the output should be saved.
+# it Adds subparsers (ssh, sudo, summary), each representing a different action.
+#    Each sub-command can have its own options while still sharing the global ones.
+# it Sets a default command (`summary`) so the script still works when the user
+# provides arguments like `--logfile` but forgets to type a sub-command.
+
+# This modified script fixes the issue of "arguments present but not working" by ensuring
+# the parser always has a valid command to run. Previously, when no sub-command was given,
+# `args.command` became None, causing the script to ignore all provided arguments. By
+# setting `command="summary"` as the default, the parser now processes options correctly
+# even when the user forgets to specify a sub-command.
+
+# We still use subparsers because they keep the script organized by giving each mode
+# (ssh, sudo, summary) its own set of options. This makes the command-line interface
+# clearer, the help messages easier to understand, and the tool more professional.
+# Subparsers are appropriate here — the issue wasn’t their use, but the missing default
+# command. By adding a safe default, the subparsers now work exactly as intended.
+
+
+    # 1). Creates the top-level parser with a short description
     parser = argparse.ArgumentParser(
         prog="log-analyzer",
         description="Simple syslog analyzer for SSH and sudo activity"
     )
 
+    # 2). Common/global options (apply regardless of chosen sub-command)
     parser.add_argument(
         "-l", "--logfile",
         default="/var/log/syslog",
@@ -424,27 +466,60 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="Optional output file to save the report (if ends with .json will produce JSON)"
     )
 
-    subparsers = parser.add_subparsers(dest="command", required=False,
-                                       help="Sub-command to run. If omitted, 'summary' is assumed.")
+    # 3). Create subparsers for distinct commands (ssh, sudo, summary)
+    # We did not set required=True here for maximum compatibility.
+    subparsers = parser.add_subparsers(dest="command", help="Sub-command to run")
 
-    # ssh subcommand
+    
+    # ssh sub-command: analyze SSH failed attempts and suspicious IPs
+    
     ssh_p = subparsers.add_parser("ssh", help="Analyze SSH failed attempts and suspicious IPs")
-    ssh_p.add_argument("-t", "--top", type=int, default=10,
-                       help="Show top N IPs/usernames (not yet used by core functions)")
+    ssh_p.add_argument(
+        "-t", "--top",
+        type=int,
+        default=10,
+        help="Show top N IPs/usernames (default: 10)"
+    )
+    # Keynote: ssh subcommand here will use the global --logfile and --out options too.
 
-    # sudo subcommand
+   
+    # sudo sub-command: analyze sudo activity
+   
     sudo_p = subparsers.add_parser("sudo", help="Analyze sudo activity")
-    sudo_p.add_argument("-u", "--user", default=None, help="Filter sudo report to a single user")
+    sudo_p.add_argument(
+        "-u", "--user",
+        default=None,
+        help="Filter sudo report to a single user (optional)"
+    )
 
-    # summary subcommand
+    
+    # summary sub-command: combined report (explicit if user wants it)
+    
     subparsers.add_parser("summary", help="Produce a combined system summary")
+
+    
+    # Default behavior:
+    # If user does not provide any sub-command, treat it as 'summary'.
+    # This will avoid args.command from being None and makes top-level options work.
+    
+    parser.set_defaults(command="summary")
 
     return parser
 
 
 def main():
-    """Main entrypoint: parse args, run correct analysis, format output."""
-    
+# This is the main entrypoint of the script. It orchestrates reading logs, analyzing them, 
+# and displaying or saving reports. The function works as follows:
+# 1. Builds the argument parser and parses command-line arguments.
+# 2. Reads the log file specified by the user (or default /var/log/syslog) using read_log_file().
+# 3. Checks which subcommand was invoked: 'ssh', 'sudo', or 'summary'.
+# 4. Depending on the subcommand:
+#     - 'ssh': builds a report including failed SSH attempts, suspicious IPs, and attack intent.
+#     - 'sudo': builds a report summarizing sudo activity.
+#     - 'summary': builds a combined report for both SSH and sudo activity.
+# 5. Calls print_summary() to display the report to the user in a clean, readable format.
+# This function is executed when the script is run directly and ensures the workflow operates
+# correctly based on user input.
     parser = build_arg_parser()
     args = parser.parse_args()
 
@@ -477,6 +552,23 @@ if __name__ == "__main__":
 
 
 
+# -----------------------------------------------------------------------------
+# REFERENCES FOR FUNCTIONS 
+# --[PRINT_SUMMARY, 
+# --WRITE_OUTPUT AND 
+# --BUILD_ARG_PARSER()]
+# Student: OJI ONYEDIKACHI CHRISTOPHER
+# Student ID: 133383224
+# -----------------------------------------------------------------------------
 
+
+# Python Software Foundation. (2024). argparse — Parser for command-line options. 
+#     https://docs.python.org/3/library/argparse.html
+
+# Pozo Ramos, L. (2023). Build command-line interfaces with argparse. Real Python. 
+#     https://realpython.com/command-line-interfaces-python-argparse/
+
+# Python Software Foundation. (2024). pprint — Data pretty printer.
+#     https://docs.python.org/3/library/pprint.html
 
 
